@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 from scipy.optimize import linprog
 
@@ -88,40 +86,43 @@ def sensitivity_table(solution):
     )
 
 
-def constraint_chart(solution, capacities):
-    df = pd.DataFrame(
-        {
-            "Resource": RESOURCES,
-            "Used": solution["used"],
-            "Available": capacities,
-        }
-    ).melt("Resource", var_name="Measure", value_name="Amount")
-    fig = px.bar(
-        df,
-        x="Resource",
-        y="Amount",
-        color="Measure",
-        barmode="group",
-        text_auto=".1f",
-        color_discrete_map={"Used": "#1976D2", "Available": "#B0BEC5"},
-        title="Resource usage at the selected plan",
+def constraint_chart_data(solution, capacities):
+    return pd.DataFrame(
+        {"Used": solution["used"], "Available": capacities}, index=RESOURCES
     )
-    fig.update_layout(yaxis_title="Units", legend_title="", height=390)
-    return fig
 
 
-def product_chart(x, title="Production plan"):
-    df = pd.DataFrame({"Flavor": PRODUCTS, "Gallons": x})
-    fig = px.bar(
-        df,
-        x="Flavor",
-        y="Gallons",
-        text_auto=".1f",
-        color="Flavor",
-        color_discrete_sequence=["#6D4C41", "#FFF3E0", "#F9A825"],
-        title=title,
-    )
-    fig.update_layout(showlegend=False, yaxis_title="Gallons", height=360)
-    fig.update_traces(textfont_color="#222222")
-    return fig
+def product_chart_data(x):
+    return pd.DataFrame({"Gallons": x}, index=PRODUCTS)
 
+
+def render_answer_card(title, answer, explanation):
+    st.subheader(title)
+    st.markdown(answer)
+    with st.expander("Why this follows from sensitivity analysis"):
+        st.markdown(explanation)
+
+
+st.title("🍦 Ken & Larry, Inc. — Ice Cream Production Optimizer")
+st.caption("Linear programming, Solver-style sensitivity analysis, and decision support")
+
+with st.sidebar:
+    st.header("Model inputs")
+    st.write("Adjust the profit and inventory assumptions, then click **Run model**.")
+    chocolate_profit = st.number_input("Chocolate profit / gallon", 0.0, 10.0, 1.00, 0.01)
+    vanilla_profit = st.number_input("Vanilla profit / gallon", 0.0, 10.0, 0.90, 0.01)
+    banana_profit = st.number_input("Banana profit / gallon", 0.0, 10.0, 0.95, 0.01)
+    milk = st.number_input("Milk available (gallons)", 0.0, 10000.0, 200.0, 1.0)
+    sugar = st.number_input("Sugar available (pounds)", 0.0, 10000.0, 150.0, 1.0)
+    cream = st.number_input("Cream available (gallons)", 0.0, 10000.0, 60.0, 1.0)
+    run = st.button("Run model", type="primary", use_container_width=True)
+
+profits = np.array([chocolate_profit, vanilla_profit, banana_profit])
+capacities = np.array([milk, sugar, cream])
+solution = solve_lp(profits, capacities)
+
+if run or "ran_once" not in st.session_state:
+    st.session_state.ran_once = True
+
+st.info(
+    "The app solves the selected LP for exploration. The textbook answers below "
